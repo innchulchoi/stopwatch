@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>발표 타이머</title>
+<style>
+  :root {
+    --bg: #0b0b0b;
+    --panel: #161615;
+    --line: #2c2c2a;
+    --muted: #888780;
+    --text: #e8e8e6;
+    --ok: #97c459;
+    --ok-fill: #639922;
+    --warn: #ef9f27;
+    --crit: #f09595;
+    --over-bg: #501313;
+    --over-text: #f7c1c1;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    transition: background-color .5s;
+    overflow: hidden;
+  }
+  body.over { background: var(--over-bg); }
+  body.idle, body.idle * { cursor: none !important; }
+  button, input { font: inherit; color: inherit; }
+  button {
+    background: transparent; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .hidden { display: none !important; }
+
+  /* 발표 화면 */
+  #timer { height: 100%; display: flex; flex-direction: column; padding: 2.5vh 3vw; }
+  .top { display: flex; justify-content: space-between; color: var(--muted); font-size: clamp(14px, 2.2vh, 22px); }
+  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; }
+  #big {
+    font-size: min(27vw, 46vh); line-height: 1; font-weight: 600;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
+    color: var(--ok); transition: color .5s, opacity .3s;
+  }
+  #big .colon { opacity: .55; }
+  #big.paused { opacity: .45; }
+  #sub { margin-top: 2vh; color: var(--muted); font-size: clamp(14px, 2.6vh, 26px); font-variant-numeric: tabular-nums; text-align: center; }
+  #status { margin-top: 1vh; font-size: clamp(13px, 2vh, 20px); color: var(--muted); min-height: 1.4em; }
+  #bar { display: flex; gap: 4px; height: 1.2vh; min-height: 8px; }
+  #bar .seg { background: var(--line); border-radius: 2px; overflow: hidden; }
+  #bar .seg.done { background: #5f5e5a; }
+  #bar .fill { height: 100%; background: var(--ok-fill); transition: background-color .5s; }
+  #labels { display: flex; gap: 4px; margin-top: 8px; font-size: clamp(11px, 1.7vh, 17px); color: var(--muted); }
+  #labels span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #labels span.cur { color: var(--text); }
+  body.over #bar .seg { background: rgba(255,255,255,.12); }
+  .controls {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin-top: 2vh; transition: opacity .4s;
+  }
+  body.idle .controls { opacity: 0; pointer-events: none; }
+  .controls .hint { color: var(--muted); font-size: 13px; align-self: center; margin-left: 8px; }
+  #toast {
+    position: fixed; left: 50%; bottom: 14vh; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 18px; font-size: 15px; opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  /* 설정 화면 */
+  #setup { height: 100%; overflow-y: auto; padding: 32px 16px; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
+  .desc { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 28px 0 10px; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 28px minmax(0,1fr) 90px 40px; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .row .n { color: var(--muted); text-align: center; }
+  input[type=text], input[type=number] {
+    width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  input:focus { outline: none; border-color: var(--muted); }
+  .row button { padding: 8px 0; }
+  .total { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid2 label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .actions { display: flex; gap: 8px; margin-top: 28px; flex-wrap: wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td.r, th.r { text-align: right; }
+  .late { color: var(--crit); }
+  .early { color: var(--ok); }
+  .keys { color: var(--muted); font-size: 13px; line-height: 1.9; }
+  kbd { border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-family: inherit; font-size: 12px; color: var(--text); }
+</style>
+</head>
+<body>
+
+<section id="setup" class="hidden">
+  <div class="wrap">
+    <h1>발표 타이머</h1>
+    <p class="desc">섹션과 시간을 정한 뒤 시작하세요. 설정과 진행 상태는 이 브라우저에 저장됩니다.</p>
+
+    <h2>섹션</h2>
+    <div id="rows"></div>
+    <button id="addRow">+ 섹션 추가</button>
+    <div class="total" id="total"></div>
+
+    <h2>경고 시점 (전체 남은 시간 기준)</h2>
+    <div class="grid2">
+      <div><label for="warn">주황색 (분 전)</label><input type="number" id="warn" min="0" step="0.5"></div>
+      <div><label for="crit">빨간색 (분 전)</label><input type="number" id="crit" min="0" step="0.5"></div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="go">발표 화면으로</button>
+      <button id="resetRun">진행 기록 초기화</button>
+    </div>
+
+    <div id="logWrap" class="hidden">
+      <h2>섹션별 기록</h2>
+      <table>
+        <thead><tr><th>섹션</th><th class="r">계획</th><th class="r">실제</th><th class="r">차이</th></tr></thead>
+        <tbody id="log"></tbody>
+      </table>
+    </div>
+
+    <h2>단축키</h2>
+    <div class="keys">
+      <kbd>Space</kbd> 시작 / 일시정지 &nbsp; <kbd>→</kbd> <kbd>PgDn</kbd> 다음 섹션 &nbsp; <kbd>←</kbd> <kbd>PgUp</kbd> 이전 섹션<br>
+      <kbd>T</kbd> 전체 ↔ 섹션 남은 시간 전환 &nbsp; <kbd>F</kbd> 전체화면 &nbsp; <kbd>R</kbd> 두 번 리셋 &nbsp; <kbd>Esc</kbd> 설정
+    </div>
+  </div>
+</section>
+
+<section id="timer" class="hidden">
+  <div class="top"><span id="secName"></span><span id="clock"></span></div>
+  <div class="center">
+    <div id="big"></div>
+    <div id="sub"></div>
+    <div id="status"></div>
+  </div>
+  <div id="bar"></div>
+  <div id="labels"></div>
+  <div class="controls">
+    <button id="bPrev" aria-label="이전 섹션">◀</button>
+    <button id="bPlay" class="primary">시작</button>
+    <button id="bNext" aria-label="다음 섹션">▶</button>
+    <button id="bMode">섹션 기준</button>
+    <button id="bFull">전체화면</button>
+    <button id="bSetup">설정</button>
+    <span class="hint">Space 시작/정지 · → 다음 섹션</span>
+  </div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+const KEY = 'presenter-timer-v1';
+const DEFAULT_CFG = {
+  sections: [
+    { name: '배경', min: 3 },
+    { name: '핵심 제안', min: 7 },
+    { name: '재무', min: 5 },
+    { name: 'Q&A', min: 5 },
+  ],
+  warn: 5,
+  crit: 1,
+  mode: 'total',
+};
+const freshRun = () => ({ acc: 0, startedAt: null, idx: 0, marks: [0], started: false });
+
+let cfg, run, view;
+(function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.cfg && s.run) { cfg = s.cfg; run = s.run; view = s.view || 'setup'; return; }
+  } catch (e) {}
+  cfg = structuredClone(DEFAULT_CFG); run = freshRun(); view = 'setup';
+})();
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ cfg, run, view })); } catch (e) {}
+}
+
+const $ = id => document.getElementById(id);
+const MIN = 60000;
+
+// 시작 시각과의 차이로 계산하므로 탭이 백그라운드로 가거나 새로고침해도 틀어지지 않는다
+const elapsed = () => run.acc + (run.startedAt ? Date.now() - run.startedAt : 0);
+const plannedStarts = () => {
+  const out = []; let t = 0;
+  for (const s of cfg.sections) { out.push(t); t += s.min * MIN; }
+  return out;
+};
+const totalMs = () => cfg.sections.reduce((a, s) => a + s.min * MIN, 0);
+
+function fmt(ms, ceil = true) {
+  let s = ceil ? Math.ceil(ms / 1000) : Math.floor(ms / 1000);
+  if (s < 0) s = 0;
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
+  const p = n => String(n).padStart(2, '0');
+  return h ? `${h}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`;
+}
+function fmtSigned(ms) {
+  const sign = ms > 0 ? '+' : ms < 0 ? '−' : '±';
+  const s = Math.round(Math.abs(ms) / 1000);
+  return `${sign}${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+const withColon = str => str.replace(/:/g, '<span class="colon">:</span>');
+
+/* ---------- 설정 화면 ---------- */
+function renderSetup() {
+  const rows = $('rows');
+  rows.innerHTML = '';
+  cfg.sections.forEach((s, i) => {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = `<span class="n">${i + 1}</span>
+      <input type="text" value="" aria-label="섹션 이름">
+      <input type="number" min="0.5" step="0.5" aria-label="분">
+      <button aria-label="삭제">✕</button>`;
+    const [name, min] = r.querySelectorAll('input');
+    name.value = s.name; min.value = s.min;
+    name.oninput = () => { s.name = name.value; save(); };
+    min.oninput = () => { const v = parseFloat(min.value); if (v > 0) { s.min = v; save(); renderTotal(); } };
+    r.querySelector('button').onclick = () => {
+      if (cfg.sections.length <= 1) return toast('섹션은 최소 1개가 필요합니다');
+      cfg.sections.splice(i, 1); clampRun(); save(); renderSetup();
+    };
+    rows.appendChild(r);
+  });
+  $('warn').value = cfg.warn;
+  $('crit').value = cfg.crit;
+  renderTotal();
+  renderLog();
+  $('go').textContent = run.started ? '발표 화면으로 (이어서)' : '발표 화면으로';
+}
+function renderTotal() {
+  $('total').textContent = `총 ${fmt(totalMs())} (${cfg.sections.length}개 섹션)`;
+}
+function renderLog() {
+  if (!run.started) { $('logWrap').classList.add('hidden'); return; }
+  $('logWrap').classList.remove('hidden');
+  const el = elapsed();
+  $('log').innerHTML = cfg.sections.map((s, i) => {
+    if (i > run.idx) return `<tr><td>${esc(s.name)}</td><td class="r">${fmt(s.min * MIN)}</td><td class="r">–</td><td class="r">–</td></tr>`;
+    const end = i < run.idx ? run.marks[i + 1] : el;
+    const actual = end - run.marks[i];
+    const diff = actual - s.min * MIN;
+    const cls = Math.abs(diff) < 1000 ? '' : diff > 0 ? 'late' : 'early';
+    return `<tr><td>${esc(s.name)}${i === run.idx ? ' (진행 중)' : ''}</td><td class="r">${fmt(s.min * MIN)}</td>
+      <td class="r">${fmt(actual, false)}</td><td class="r ${cls}">${fmtSigned(diff)}</td></tr>`;
+  }).join('');
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function clampRun() {
+  if (run.idx > cfg.sections.length - 1) {
+    run.idx = cfg.sections.length - 1;
+    run.marks.length = run.idx + 1;
+  }
+}
+
+$('addRow').onclick = () => { cfg.sections.push({ name: `섹션 ${cfg.sections.length + 1}`, min: 5 }); save(); renderSetup(); };
+$('warn').oninput = () => { const v = parseFloat($('warn').value); if (v >= 0) { cfg.warn = v; save(); } };
+$('crit').oninput = () => { const v = parseFloat($('crit').value); if (v >= 0) { cfg.crit = v; save(); } };
+$('go').onclick = () => show('timer');
+$('resetRun').onclick = () => {
+  if (!run.started || confirm('진행 기록을 초기화할까요?')) { run = freshRun(); save(); renderSetup(); toast('초기화했습니다'); }
+};
+
+/* ---------- 발표 화면 ---------- */
+function buildBar() {
+  const total = totalMs();
+  $('bar').innerHTML = cfg.sections.map(s => `<div class="seg" style="flex:${s.min * MIN / total}"><div class="fill" style="width:0"></div></div>`).join('');
+  $('labels').innerHTML = cfg.sections.map(s => `<span style="flex:${s.min * MIN / total}">${esc(s.name)}</span>`).join('');
+}
+
+function tick() {
+  $('clock').textContent = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (view !== 'timer') return;
+
+  const el = elapsed();
+  const total = totalMs();
+  const remainTotal = total - el;
+  const sec = cfg.sections[run.idx];
+  const secElapsed = el - run.marks[run.idx];
+  const remainSec = sec.min * MIN - secElapsed;
+  const pace = run.marks[run.idx] - plannedStarts()[run.idx];
+
+  const main = cfg.mode === 'total' ? remainTotal : remainSec;
+  const big = $('big');
+  big.innerHTML = withColon(main < 0 ? '+' + fmt(-main, false) : fmt(main));
+  big.classList.toggle('paused', run.started && !run.startedAt);
+
+  // 색 상태는 전체 남은 시간 기준
+  let color = 'var(--ok)', fill = 'var(--ok-fill)';
+  if (remainTotal <= 0) { color = 'var(--over-text)'; fill = 'var(--crit)'; }
+  else if (remainTotal <= cfg.crit * MIN) { color = 'var(--crit)'; fill = 'var(--crit)'; }
+  else if (remainTotal <= cfg.warn * MIN) { color = 'var(--warn)'; fill = 'var(--warn)'; }
+  if (cfg.mode === 'section' && remainSec < 0 && remainTotal > 0) color = 'var(--warn)';
+  big.style.color = color;
+  document.body.classList.toggle('over', remainTotal < 0);
+
+  const subParts = cfg.mode === 'total'
+    ? [`전체 남은 시간`, `섹션 ${remainSec < 0 ? '+' + fmt(-remainSec, false) + ' 초과' : fmt(remainSec) + ' 남음'}`]
+    : [`섹션 남은 시간`, `전체 ${remainTotal < 0 ? '+' + fmt(-remainTotal, false) + ' 초과' : fmt(remainTotal) + ' 남음'}`];
+  subParts.push(`경과 ${fmt(el, false)}`);
+  $('sub').textContent = subParts.join(' · ');
+
+  $('secName').textContent = `${run.idx + 1} / ${cfg.sections.length} · ${sec.name}`;
+
+  let status = '';
+  if (!run.started) status = 'Space를 누르면 시작합니다';
+  else if (!run.startedAt) status = '일시정지';
+  else if (run.idx > 0 && Math.abs(pace) >= 5000) status = pace > 0 ? `계획 대비 ${fmtSigned(pace)} 늦음` : `계획 대비 ${fmtSigned(pace)} 빠름`;
+  else if (run.idx > 0) status = '계획대로 진행 중';
+  $('status').textContent = status;
+
+  const segs = $('bar').children, labels = $('labels').children;
+  for (let i = 0; i < segs.length; i++) {
+    const f = segs[i].firstChild;
+    segs[i].classList.toggle('done', i < run.idx);
+    labels[i].classList.toggle('cur', i === run.idx);
+    if (i < run.idx) f.style.width = '0';
+    else if (i === run.idx) { f.style.width = Math.min(100, secElapsed / (cfg.sections[i].min * MIN) * 100) + '%'; f.style.background = fill; }
+    else f.style.width = '0';
+  }
+
+  $('bPlay').textContent = run.startedAt ? '일시정지' : run.started ? '계속' : '시작';
+  $('bMode').textContent = cfg.mode === 'total' ? '섹션 기준' : '전체 기준';
+}
+
+function toggle() {
+  if (run.startedAt) { run.acc += Date.now() - run.startedAt; run.startedAt = null; }
+  else { run.startedAt = Date.now(); run.started = true; }
+  save(); tick(); keepAwake();
+}
+function next() {
+  if (!run.started) return toast('먼저 시작하세요');
+  if (run.idx >= cfg.sections.length - 1) return toast('마지막 섹션입니다');
+  run.idx++; run.marks[run.idx] = elapsed(); save(); tick();
+  toast(`${run.idx + 1}. ${cfg.sections[run.idx].name}`);
+}
+function prev() {
+  if (run.idx === 0) return;
+  run.idx--; run.marks.length = run.idx + 1; save(); tick();
+  toast(`${run.idx + 1}. ${cfg.sections[run.idx].name}`);
+}
+let resetArmed = 0;
+function resetPress() {
+  if (Date.now() - resetArmed < 2000) { run = freshRun(); resetArmed = 0; save(); tick(); toast('리셋했습니다'); }
+  else { resetArmed = Date.now(); toast('리셋하려면 R을 한 번 더 누르세요'); }
+}
+function toggleMode() { cfg.mode = cfg.mode === 'total' ? 'section' : 'total'; save(); tick(); }
+function toggleFull() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.().catch(() => toast('전체화면을 열 수 없습니다'));
+}
+
+$('bPlay').onclick = toggle;
+$('bNext').onclick = next;
+$('bPrev').onclick = prev;
+$('bMode').onclick = toggleMode;
+$('bFull').onclick = toggleFull;
+$('bSetup').onclick = () => show('setup');
+
+document.addEventListener('keydown', e => {
+  if (view !== 'timer' || e.target.tagName === 'INPUT') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (k === ' ' || k === 'Enter' || k === 'b' || k === 'B' || k === '.') { e.preventDefault(); toggle(); }
+  else if (k === 'ArrowRight' || k === 'PageDown') { e.preventDefault(); next(); }
+  else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); prev(); }
+  else if (k === 't' || k === 'T') toggleMode();
+  else if (k === 'f' || k === 'F') toggleFull();
+  else if (k === 'r' || k === 'R') resetPress();
+  else if (k === 'Escape' && !document.fullscreenElement) show('setup');
+  if (e.target.tagName === 'BUTTON') e.target.blur();
+});
+
+/* ---------- 공통 ---------- */
+function show(v) {
+  view = v; save();
+  $('setup').classList.toggle('hidden', v !== 'setup');
+  $('timer').classList.toggle('hidden', v !== 'timer');
+  document.body.classList.remove('over', 'idle');
+  if (v === 'setup') renderSetup();
+  else { buildBar(); tick(); poke(); }
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+// 마우스를 움직이지 않으면 버튼과 커서를 숨긴다
+let idleTimer;
+function poke() {
+  document.body.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (view === 'timer' && run.started) document.body.classList.add('idle'); }, 2500);
+}
+document.addEventListener('mousemove', poke);
+document.addEventListener('touchstart', poke);
+
+// 발표 중 화면 꺼짐 방지
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator && run.startedAt && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { keepAwake(); tick(); } });
+
+// 다른 탭에서 설정이 바뀌면 반영
+window.addEventListener('storage', e => {
+  if (e.key !== KEY) return;
+  try {
+    const s = JSON.parse(e.newValue); cfg = s.cfg; run = s.run;
+    if (view === 'setup') renderSetup(); else { buildBar(); tick(); }
+  } catch (err) {}
+});
+
+setInterval(tick, 200);
+show(view);
+keepAwake();
+</script>
+</body>
+</html>

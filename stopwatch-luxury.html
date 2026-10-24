@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>크로노그래프</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4ede1;
+    --text: #2b1d14;
+    --muted: #8c7a68;
+    --line: #e2d6c3;
+    --orange: #e8641b;
+    --card: #fbf7f0;
+    --best: #3c7a3c;
+    --worst: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17110c;
+      --text: #f1e7d8;
+      --muted: #a08d78;
+      --line: #3a2d22;
+      --card: #211811;
+      --best: #7fbf7f;
+      --worst: #ff8a7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Cormorant Garamond", Georgia, serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+  }
+  .watch { width: 100%; max-width: 340px; display: block; }
+  .pusher { cursor: pointer; }
+  .pusher:active { transform-box: fill-box; }
+  .readout {
+    font-size: 44px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: 1px;
+    margin: 8px 0 4px;
+  }
+  .controls { display: flex; gap: 12px; margin: 12px 0 24px; }
+  button {
+    font-family: inherit;
+    font-size: 18px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 26px;
+    border-radius: 2px;
+    border: 1px solid var(--text);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background .2s, color .2s;
+  }
+  button:disabled { opacity: .35; cursor: default; }
+  button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+  button.primary.running { background: var(--text); border-color: var(--text); color: var(--bg); }
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 340px;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  li {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 4px;
+    border-top: 1px solid var(--line);
+    font-size: 19px;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  li .n { font-style: italic; color: var(--muted); }
+  li .total { color: var(--muted); font-size: 15px; margin-left: 10px; }
+  li.best { color: var(--best); }
+  li.worst { color: var(--worst); }
+  .hint { color: var(--muted); font-size: 15px; letter-spacing: 1px; margin-top: 20px; }
+</style>
+</head>
+<body>
+  <svg class="watch" viewBox="0 0 400 640" aria-label="크로노그래프 시계">
+    <defs>
+      <linearGradient id="leather" x1="0" x2="1">
+        <stop offset="0" stop-color="#8f5328"/>
+        <stop offset=".5" stop-color="#b8743c"/>
+        <stop offset="1" stop-color="#8f5328"/>
+      </linearGradient>
+      <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f4f4f2"/>
+        <stop offset=".45" stop-color="#b9b9b6"/>
+        <stop offset=".55" stop-color="#d9d9d6"/>
+        <stop offset="1" stop-color="#8d8d8a"/>
+      </linearGradient>
+      <radialGradient id="dial" cx=".45" cy=".4" r=".7">
+        <stop offset="0" stop-color="#fdfaf3"/>
+        <stop offset="1" stop-color="#ece2cf"/>
+      </radialGradient>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity=".25"/>
+      </filter>
+    </defs>
+
+    <!-- 가죽 스트랩 -->
+    <g filter="url(#shadow)">
+      <rect x="138" y="-20" width="124" height="210" rx="8" fill="url(#leather)"/>
+      <rect x="138" y="450" width="124" height="210" rx="8" fill="url(#leather)"/>
+    </g>
+    <g fill="none" stroke="#f3e6cf" stroke-width="1.6" stroke-dasharray="5 4" opacity=".9">
+      <path d="M147 -20 V180 M253 -20 V180"/>
+      <path d="M147 460 V660 M253 460 V660"/>
+    </g>
+    <!-- 스트랩 구멍 -->
+    <g fill="#5a3218">
+      <circle cx="200" cy="530" r="4"/><circle cx="200" cy="565" r="4"/><circle cx="200" cy="600" r="4"/>
+    </g>
+
+    <!-- 비대칭 등자형 러그 -->
+    <g fill="none" stroke="url(#steel)" stroke-width="11" stroke-linecap="round">
+      <path d="M136 222 C146 172 172 156 204 156 C236 156 256 170 266 206"/>
+      <path d="M136 222 C146 172 172 156 204 156 C236 156 256 170 266 206" transform="rotate(180 200 320)"/>
+    </g>
+
+    <!-- 푸셔 & 크라운 -->
+    <g id="pushStart" class="pusher" transform="rotate(55 200 320)">
+      <rect x="191" y="152" width="18" height="22" rx="3" fill="url(#steel)" stroke="#7d7d7a" stroke-width=".8"/>
+    </g>
+    <g id="pushLap" class="pusher" transform="rotate(125 200 320)">
+      <rect x="191" y="152" width="18" height="22" rx="3" fill="url(#steel)" stroke="#7d7d7a" stroke-width=".8"/>
+    </g>
+    <g transform="rotate(90 200 320)">
+      <rect x="186" y="150" width="28" height="24" rx="4" fill="url(#steel)" stroke="#7d7d7a" stroke-width=".8"/>
+      <path d="M190 152 V172 M195 152 V172 M200 152 V172 M205 152 V172 M210 152 V172" stroke="#8d8d8a" stroke-width=".8"/>
+    </g>
+
+    <!-- 케이스 & 다이얼 -->
+    <circle cx="200" cy="320" r="150" fill="url(#steel)" filter="url(#shadow)"/>
+    <circle cx="200" cy="320" r="141" fill="#cfcfcc"/>
+    <circle cx="200" cy="320" r="136" fill="url(#dial)"/>
+    <g id="ticks"></g>
+    <g id="numerals" font-family="'Cormorant Garamond', Georgia, serif" font-style="italic" font-weight="500" font-size="27" fill="#2b1d14" text-anchor="middle"></g>
+    <text x="200" y="272" text-anchor="middle" font-family="'Cormorant Garamond', Georgia, serif" font-size="8" letter-spacing="2.5" fill="#6d5a48">CHRONOGRAPHE</text>
+
+    <!-- 30분 카운터 서브다이얼 -->
+    <circle cx="200" cy="372" r="30" fill="#f1e8d6" stroke="#cbbfa9" stroke-width="1"/>
+    <g id="subTicks"></g>
+    <g font-family="'Cormorant Garamond', Georgia, serif" font-size="9" fill="#6d5a48" text-anchor="middle">
+      <text x="200" y="356">30</text>
+      <text x="219" y="386">10</text>
+      <text x="181" y="386">20</text>
+    </g>
+    <line id="subHand" x1="200" y1="376" x2="200" y2="348" stroke="#e8641b" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="200" cy="372" r="2.5" fill="#e8641b"/>
+
+    <!-- 현재 시각 바늘 -->
+    <path id="hourHand" d="M200 336 L195 320 L200 250 L205 320 Z" fill="#1f2740"/>
+    <path id="minHand" d="M200 340 L196.5 320 L200 200 L203.5 320 Z" fill="#1f2740"/>
+    <!-- 크로노 초침 -->
+    <g id="chronoHand">
+      <line x1="200" y1="350" x2="200" y2="190" stroke="#e8641b" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="200" cy="342" r="4.5" fill="#e8641b"/>
+    </g>
+    <circle cx="200" cy="320" r="5" fill="#e8641b"/>
+    <circle cx="200" cy="320" r="1.8" fill="#fbf7f0"/>
+  </svg>
+
+  <div class="readout" id="readout">00:00.00</div>
+  <div class="controls">
+    <button id="lapBtn" disabled>Tour</button>
+    <button id="startBtn" class="primary">Départ</button>
+  </div>
+  <ol id="laps"></ol>
+  <p class="hint">Space 시작/정지 · L 랩 · R 초기화 · 오른쪽 푸셔 클릭 가능</p>
+
+<script>
+  const NS = 'http://www.w3.org/2000/svg';
+  const CX = 200, CY = 320;
+
+  // 분 눈금 60개
+  const ticks = document.getElementById('ticks');
+  for (let i = 0; i < 60; i++) {
+    const major = i % 5 === 0;
+    const l = document.createElementNS(NS, 'line');
+    l.setAttribute('x1', CX); l.setAttribute('x2', CX);
+    l.setAttribute('y1', CY - 134); l.setAttribute('y2', CY - (major ? 124 : 129));
+    l.setAttribute('stroke', major ? '#2b1d14' : '#8c7a68');
+    l.setAttribute('stroke-width', major ? 1.6 : .8);
+    l.setAttribute('transform', `rotate(${i * 6} ${CX} ${CY})`);
+    ticks.appendChild(l);
+  }
+
+  // 달리는 듯 기울어진 숫자
+  const numerals = document.getElementById('numerals');
+  for (let h = 1; h <= 12; h++) {
+    const a = h * 30 * Math.PI / 180;
+    const x = CX + 104 * Math.sin(a), y = CY - 104 * Math.cos(a);
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('transform', `translate(${x.toFixed(1)} ${(y + 9).toFixed(1)}) skewX(-14)`);
+    t.textContent = h;
+    numerals.appendChild(t);
+  }
+
+  // 서브다이얼 눈금
+  const subTicks = document.getElementById('subTicks');
+  for (let i = 0; i < 30; i++) {
+    const l = document.createElementNS(NS, 'line');
+    l.setAttribute('x1', CX); l.setAttribute('x2', CX);
+    l.setAttribute('y1', 372 - 29); l.setAttribute('y2', 372 - (i % 5 === 0 ? 24 : 26.5));
+    l.setAttribute('stroke', '#8c7a68');
+    l.setAttribute('stroke-width', i % 5 === 0 ? 1 : .5);
+    l.setAttribute('transform', `rotate(${i * 12} ${CX} 372)`);
+    subTicks.appendChild(l);
+  }
+
+  const readout = document.getElementById('readout');
+  const startBtn = document.getElementById('startBtn');
+  const lapBtn = document.getElementById('lapBtn');
+  const lapList = document.getElementById('laps');
+  const hourHand = document.getElementById('hourHand');
+  const minHand = document.getElementById('minHand');
+  const chronoHand = document.getElementById('chronoHand');
+  const subHand = document.getElementById('subHand');
+
+  let running = false, startTime = 0, elapsed = 0, lapStart = 0, laps = [];
+
+  function format(ms) {
+    const totalCs = Math.floor(ms / 10);
+    const cs = totalCs % 100;
+    const s = Math.floor(totalCs / 100) % 60;
+    const m = Math.floor(totalCs / 6000) % 60;
+    const h = Math.floor(totalCs / 360000);
+    const pad = n => String(n).padStart(2, '0');
+    return (h ? h + ':' : '') + pad(m) + ':' + pad(s) + '.' + pad(cs);
+  }
+
+  function now() {
+    return running ? elapsed + performance.now() - startTime : elapsed;
+  }
+
+  function frame() {
+    const t = now();
+    chronoHand.setAttribute('transform', `rotate(${(t / 1000 % 60) * 6} ${CX} ${CY})`);
+    subHand.setAttribute('transform', `rotate(${(t / 60000 % 30) * 12} ${CX} 372)`);
+    readout.textContent = format(t);
+
+    const d = new Date();
+    const min = d.getMinutes() + d.getSeconds() / 60;
+    minHand.setAttribute('transform', `rotate(${min * 6} ${CX} ${CY})`);
+    hourHand.setAttribute('transform', `rotate(${(d.getHours() % 12 + min / 60) * 30} ${CX} ${CY})`);
+    requestAnimationFrame(frame);
+  }
+
+  function renderLaps() {
+    lapList.innerHTML = '';
+    const min = Math.min(...laps), max = Math.max(...laps);
+    let total = 0;
+    const rows = laps.map((d, i) => {
+      total += d;
+      const li = document.createElement('li');
+      if (laps.length >= 3 && d === min) li.className = 'best';
+      if (laps.length >= 3 && d === max) li.className = 'worst';
+      li.innerHTML = `<span class="n">Tour ${i + 1}</span><span>${format(d)}<span class="total">${format(total)}</span></span>`;
+      return li;
+    });
+    rows.reverse().forEach(li => lapList.appendChild(li));
+  }
+
+  function toggle() {
+    if (running) {
+      elapsed = now();
+      running = false;
+      startBtn.textContent = 'Départ';
+      startBtn.classList.remove('running');
+      lapBtn.textContent = 'Zéro';
+    } else {
+      startTime = performance.now();
+      running = true;
+      startBtn.textContent = 'Arrêt';
+      startBtn.classList.add('running');
+      lapBtn.textContent = 'Tour';
+      lapBtn.disabled = false;
+    }
+  }
+
+  function lap() {
+    if (!running) return;
+    const t = now();
+    laps.push(t - lapStart);
+    lapStart = t;
+    renderLaps();
+  }
+
+  function reset() {
+    if (running) return;
+    elapsed = 0; lapStart = 0; laps = [];
+    lapList.innerHTML = '';
+    lapBtn.textContent = 'Tour';
+    lapBtn.disabled = true;
+  }
+
+  const lapOrReset = () => (running ? lap() : reset());
+  startBtn.addEventListener('click', toggle);
+  lapBtn.addEventListener('click', lapOrReset);
+  document.getElementById('pushStart').addEventListener('click', toggle);
+  document.getElementById('pushLap').addEventListener('click', lapOrReset);
+
+  document.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.code === 'KeyL') lap();
+    else if (e.code === 'KeyR') reset();
+  });
+
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

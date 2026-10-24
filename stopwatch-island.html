@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>섬 스탑워치</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #eaf4d3;
+    --dot: #dcecbb;
+    --sky-top: #8fd3f4;
+    --sky-bottom: #d9f2fb;
+    --grass: #7cc35b;
+    --grass-dark: #5fa944;
+    --wood: #a8744a;
+    --wood-dark: #7d5232;
+    --cream: #fff8e7;
+    --text: #6b4a2e;
+    --muted: #a88b6c;
+    --yellow: #ffd65c;
+    --yellow-dark: #e0a92b;
+    --mint: #8ed9c3;
+    --mint-dark: #5bb79c;
+    --best: #3f9d5a;
+    --worst: #e0645a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #1d2a33;
+      --dot: #24343f;
+      --sky-top: #182848;
+      --sky-bottom: #3b4f7a;
+      --grass: #3f7a4a;
+      --grass-dark: #2f6239;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Jua", "Malgun Gothic", sans-serif;
+    color: var(--text);
+    background-color: var(--page);
+    background-image: radial-gradient(var(--dot) 18%, transparent 19%);
+    background-size: 28px 28px;
+    display: flex;
+    justify-content: center;
+    padding: 28px 16px 48px;
+  }
+  .app { width: 100%; max-width: 440px; }
+
+  /* 풍경 */
+  .scene {
+    position: relative;
+    height: 230px;
+    border-radius: 28px;
+    overflow: hidden;
+    background: linear-gradient(var(--sky-top), var(--sky-bottom));
+    border: 5px solid var(--cream);
+    box-shadow: 0 6px 0 var(--wood-dark), 0 10px 24px rgba(0,0,0,.15);
+  }
+  .ground {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 62px;
+    background:
+      radial-gradient(circle at 20px 14px, var(--grass-dark) 3px, transparent 4px) 0 0 / 46px 26px,
+      var(--grass);
+    border-top: 4px solid var(--grass-dark);
+  }
+  .cloud {
+    position: absolute;
+    width: 70px; height: 24px;
+    background: #fff;
+    border-radius: 20px;
+    opacity: .9;
+    animation: drift linear infinite;
+  }
+  .cloud::before, .cloud::after {
+    content: ""; position: absolute; background: #fff; border-radius: 50%;
+  }
+  .cloud::before { width: 32px; height: 32px; left: 10px; top: -16px; }
+  .cloud::after { width: 24px; height: 24px; left: 34px; top: -10px; }
+  .c1 { top: 30px; animation-duration: 38s; }
+  .c2 { top: 64px; animation-duration: 55s; animation-delay: -25s; transform: scale(.7); }
+  @keyframes drift { from { left: -100px; } to { left: 110%; } }
+  .stars, .moon { display: none; }
+  @media (prefers-color-scheme: dark) {
+    .cloud { opacity: .25; }
+    .moon {
+      display: block; position: absolute; top: 22px; right: 34px;
+      width: 34px; height: 34px; border-radius: 50%;
+      box-shadow: -8px 4px 0 0 #fff3b0;
+    }
+    .stars {
+      display: block; position: absolute; inset: 0 0 62px 0;
+      background-image:
+        radial-gradient(#fff 1px, transparent 1.5px),
+        radial-gradient(#fff 1px, transparent 1.5px);
+      background-size: 60px 50px, 90px 70px;
+      background-position: 10px 8px, 40px 30px;
+      opacity: .7;
+    }
+  }
+  .tree { position: absolute; bottom: 50px; width: 70px; }
+  .t1 { left: 14px; }
+  .t2 { right: 18px; width: 56px; }
+  .flower { position: absolute; bottom: 20px; font-size: 0; }
+
+  /* 캐릭터 */
+  .critter {
+    position: absolute;
+    bottom: 34px;
+    left: 0;
+    width: 72px;
+    will-change: transform;
+  }
+  .critter .flip { transform-origin: center; transition: transform .15s; }
+  .critter.left .flip { transform: scaleX(-1); }
+  .critter .bob { animation: idle 2.4s ease-in-out infinite; transform-origin: bottom center; }
+  .critter.walking .bob { animation: bob .36s ease-in-out infinite; }
+  .critter.jump .bob { animation: jump .55s ease-out; }
+  .critter .leg { transform-box: fill-box; transform-origin: top center; }
+  .critter.walking .legA { animation: step .36s ease-in-out infinite; }
+  .critter.walking .legB { animation: step .36s ease-in-out infinite reverse; }
+  @keyframes idle { 0%,100% { transform: scale(1, 1); } 50% { transform: scale(1.03, .97); } }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes jump {
+    0% { transform: translateY(0) scale(1.1, .9); }
+    40% { transform: translateY(-34px) scale(.95, 1.05); }
+    100% { transform: translateY(0) scale(1, 1); }
+  }
+  @keyframes step { 0%,100% { transform: rotate(22deg); } 50% { transform: rotate(-22deg); } }
+
+  .bubble {
+    position: absolute;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    transform-origin: bottom center;
+    white-space: nowrap;
+    background: var(--cream);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 18px;
+    font-size: 16px;
+    box-shadow: 0 3px 0 rgba(0,0,0,.12);
+    transition: transform .2s cubic-bezier(.3, 1.6, .5, 1);
+  }
+  .bubble::after {
+    content: ""; position: absolute; left: 50%; bottom: -8px; margin-left: -8px;
+    border: 8px solid transparent; border-top-color: var(--cream); border-bottom: 0;
+  }
+  .bubble.show { transform: translateX(-50%) scale(1); }
+
+  /* 나무 간판 시계 */
+  .sign {
+    position: relative;
+    margin: 22px auto 0;
+    width: 88%;
+    background: var(--wood);
+    border-radius: 22px;
+    padding: 10px;
+    box-shadow: 0 6px 0 var(--wood-dark);
+  }
+  .sign::before, .sign::after {
+    content: ""; position: absolute; top: -22px; width: 10px; height: 26px;
+    background: var(--wood-dark); border-radius: 4px;
+  }
+  .sign::before { left: 22%; }
+  .sign::after { right: 22%; }
+  .readout {
+    background: var(--cream);
+    border-radius: 14px;
+    text-align: center;
+    font-size: clamp(44px, 13vw, 60px);
+    font-variant-numeric: tabular-nums;
+    padding: 6px 0 2px;
+    letter-spacing: 1px;
+  }
+
+  .controls { display: flex; justify-content: center; gap: 14px; margin: 26px 0 22px; }
+  button {
+    font-family: inherit;
+    font-size: 20px;
+    color: var(--text);
+    min-width: 120px;
+    padding: 12px 22px;
+    border: none;
+    border-radius: 999px;
+    background: var(--cream);
+    box-shadow: 0 5px 0 #d9c8a6;
+    cursor: pointer;
+    transition: transform .08s, box-shadow .08s;
+  }
+  button:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 #d9c8a6; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.go { background: var(--yellow); box-shadow: 0 5px 0 var(--yellow-dark); }
+  button.go:active { box-shadow: 0 1px 0 var(--yellow-dark); }
+  button.go.running { background: var(--mint); box-shadow: 0 5px 0 var(--mint-dark); color: #fff; }
+  button.go.running:active { box-shadow: 0 1px 0 var(--mint-dark); }
+
+  /* 수첩 */
+  .note {
+    background: var(--cream);
+    border-radius: 20px;
+    padding: 14px 18px 8px;
+    box-shadow: 0 5px 0 #d9c8a6;
+  }
+  .note h2 { margin: 0 0 6px; font-size: 18px; font-weight: normal; color: var(--muted); }
+  .note .empty { color: var(--muted); padding: 10px 0 12px; font-size: 15px; }
+  ol { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+  li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 2px;
+    border-top: 2px dashed #ecdfc4;
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+  li .total { color: var(--muted); font-size: 14px; margin-left: 8px; }
+  li .tag { font-size: 12px; color: #fff; border-radius: 8px; padding: 2px 7px; margin-left: 6px; }
+  li.best .tag { background: var(--best); }
+  li.worst .tag { background: var(--worst); }
+  .hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 18px; }
+  @media (prefers-color-scheme: dark) { .hint { color: #9fb3c0; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scene" id="scene">
+    <div class="stars"></div>
+    <div class="moon"></div>
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+
+    <!-- 과일 나무 -->
+    <svg class="tree t1" viewBox="0 0 70 100">
+      <rect x="29" y="58" width="12" height="40" rx="5" fill="#8a5a36"/>
+      <circle cx="35" cy="38" r="30" fill="#4fa64a"/>
+      <circle cx="22" cy="30" r="16" fill="#62b95a"/>
+      <circle cx="22" cy="44" r="5" fill="#ff7a6b"/>
+      <circle cx="46" cy="30" r="5" fill="#ff7a6b"/>
+      <circle cx="40" cy="52" r="5" fill="#ff7a6b"/>
+    </svg>
+    <svg class="tree t2" viewBox="0 0 70 100">
+      <rect x="29" y="58" width="12" height="40" rx="5" fill="#8a5a36"/>
+      <circle cx="35" cy="40" r="28" fill="#4fa64a"/>
+      <circle cx="46" cy="32" r="14" fill="#62b95a"/>
+      <circle cx="26" cy="46" r="5" fill="#ffb347"/>
+      <circle cx="44" cy="50" r="5" fill="#ffb347"/>
+    </svg>
+
+    <div class="ground"></div>
+
+    <!-- 꽃 -->
+    <svg style="position:absolute;bottom:14px;left:38%;width:18px" viewBox="0 0 20 20"><g fill="#ff9fc0"><circle cx="10" cy="4" r="4"/><circle cx="16" cy="10" r="4"/><circle cx="10" cy="16" r="4"/><circle cx="4" cy="10" r="4"/></g><circle cx="10" cy="10" r="3" fill="#ffe066"/></svg>
+    <svg style="position:absolute;bottom:22px;left:70%;width:15px" viewBox="0 0 20 20"><g fill="#fff"><circle cx="10" cy="4" r="4"/><circle cx="16" cy="10" r="4"/><circle cx="10" cy="16" r="4"/><circle cx="4" cy="10" r="4"/></g><circle cx="10" cy="10" r="3" fill="#ffe066"/></svg>
+
+    <!-- 캐릭터 (오리지널 고양이 주민) -->
+    <div class="critter" id="critter">
+      <div class="bubble" id="bubble"></div>
+      <div class="flip">
+        <svg class="bob" viewBox="0 0 80 92">
+          <ellipse cx="40" cy="89" rx="20" ry="3" fill="rgba(0,0,0,.15)"/>
+          <path d="M20 66 C6 62 8 46 14 48" fill="none" stroke="#f2b27a" stroke-width="6" stroke-linecap="round"/>
+          <rect class="leg legA" x="29" y="74" width="9" height="14" rx="4.5" fill="#e59f63"/>
+          <rect class="leg legB" x="44" y="74" width="9" height="14" rx="4.5" fill="#e59f63"/>
+          <ellipse cx="41" cy="66" rx="17" ry="14" fill="#6cc1e0"/>
+          <path d="M25 64 H57" stroke="#fff" stroke-width="3"/>
+          <path d="M25 71 H57" stroke="#fff" stroke-width="3" opacity=".8"/>
+          <path d="M22 22 L26 2 L38 14 Z" fill="#f2b27a"/>
+          <path d="M50 13 L62 2 L64 22 Z" fill="#f2b27a"/>
+          <path d="M26 17 L27.5 8 L33 13 Z" fill="#ff9fb2"/>
+          <path d="M54 12 L60 7 L61 17 Z" fill="#ff9fb2"/>
+          <circle cx="43" cy="34" r="23" fill="#f6c28b"/>
+          <ellipse cx="47" cy="34" rx="3" ry="4" fill="#3a2a20"/>
+          <ellipse cx="59" cy="34" rx="3" ry="4" fill="#3a2a20"/>
+          <circle cx="48" cy="32.5" r="1.1" fill="#fff"/>
+          <circle cx="60" cy="32.5" r="1.1" fill="#fff"/>
+          <ellipse cx="41" cy="42" rx="4.5" ry="2.8" fill="#ff9fb2" opacity=".7"/>
+          <ellipse cx="64" cy="41" rx="3.5" ry="2.6" fill="#ff9fb2" opacity=".7"/>
+          <path d="M50 42 q2.5 2.5 3.5 0 q1 2.5 3.5 0" fill="none" stroke="#3a2a20" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M40 12 C44 2 54 2 56 6 C50 6 46 9 42 13 Z" fill="#5fbf4a"/>
+          <path d="M42 12 C46 8 50 6 55 6" fill="none" stroke="#3f8f33" stroke-width="1"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="sign"><div class="readout" id="readout">00:00.00</div></div>
+
+  <div class="controls">
+    <button id="lapBtn" disabled>랩</button>
+    <button id="startBtn" class="go">시작!</button>
+  </div>
+
+  <div class="note">
+    <h2>📒 랩 기록</h2>
+    <div class="empty" id="empty">아직 기록이 없어요~</div>
+    <ol id="laps"></ol>
+  </div>
+  <p class="hint">Space 시작/정지 · L 랩 · R 초기화</p>
+</div>
+
+<script>
+  const scene = document.getElementById('scene');
+  const critter = document.getElementById('critter');
+  const bubble = document.getElementById('bubble');
+  const readout = document.getElementById('readout');
+  const startBtn = document.getElementById('startBtn');
+  const lapBtn = document.getElementById('lapBtn');
+  const lapList = document.getElementById('laps');
+  const empty = document.getElementById('empty');
+
+  let running = false, startTime = 0, elapsed = 0, lapStart = 0, laps = [];
+  let x = 60, dir = 1, lastFrame = performance.now(), bubbleTimer = null;
+  const SPEED = 70; // px/s
+
+  function format(ms) {
+    const totalCs = Math.floor(ms / 10);
+    const cs = totalCs % 100;
+    const s = Math.floor(totalCs / 100) % 60;
+    const m = Math.floor(totalCs / 6000) % 60;
+    const h = Math.floor(totalCs / 360000);
+    const pad = n => String(n).padStart(2, '0');
+    return (h ? h + ':' : '') + pad(m) + ':' + pad(s) + '.' + pad(cs);
+  }
+
+  function now() {
+    return running ? elapsed + performance.now() - startTime : elapsed;
+  }
+
+  // 작은 "뾰롱" 효과음
+  let audio;
+  function blip(freq = 660) {
+    try {
+      audio = audio || new AudioContext();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, audio.currentTime);
+      o.frequency.exponentialRampToValueAtTime(freq * 1.5, audio.currentTime + .08);
+      g.gain.setValueAtTime(.12, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + .18);
+      o.connect(g).connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + .2);
+    } catch (e) {}
+  }
+
+  function say(text, ms = 1600) {
+    bubble.textContent = text;
+    bubble.classList.add('show');
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(() => bubble.classList.remove('show'), ms);
+  }
+
+  function jump() {
+    const bob = critter.querySelector('.bob');
+    critter.classList.remove('jump');
+    void bob.offsetWidth;
+    critter.classList.add('jump');
+    setTimeout(() => critter.classList.remove('jump'), 550);
+  }
+
+  function frame(ts) {
+    const dt = Math.min((ts - lastFrame) / 1000, .25);
+    lastFrame = ts;
+    if (running) {
+      const maxX = scene.clientWidth - critter.offsetWidth - 10;
+      x += dir * SPEED * dt;
+      if (x >= maxX) { x = maxX; dir = -1; }
+      if (x <= 10) { x = 10; dir = 1; }
+      critter.classList.toggle('left', dir < 0);
+    }
+    critter.style.transform = `translateX(${x}px)`;
+    readout.textContent = format(now());
+    requestAnimationFrame(frame);
+  }
+
+  function renderLaps() {
+    lapList.innerHTML = '';
+    empty.style.display = laps.length ? 'none' : 'block';
+    const min = Math.min(...laps), max = Math.max(...laps);
+    let total = 0;
+    const rows = laps.map((d, i) => {
+      total += d;
+      const li = document.createElement('li');
+      let tag = '';
+      if (laps.length >= 3 && d === min) { li.className = 'best'; tag = '<span class="tag">최고!</span>'; }
+      if (laps.length >= 3 && d === max) { li.className = 'worst'; tag = '<span class="tag">느긋</span>'; }
+      li.innerHTML = `<span>랩 ${i + 1}${tag}</span><span>${format(d)}<span class="total">${format(total)}</span></span>`;
+      return li;
+    });
+    rows.reverse().forEach(li => lapList.appendChild(li));
+  }
+
+  function toggle() {
+    if (running) {
+      elapsed = now();
+      running = false;
+      critter.classList.remove('walking');
+      startBtn.textContent = '시작!';
+      startBtn.classList.remove('running');
+      lapBtn.textContent = '초기화';
+      say('휴~ 잠깐 쉬어갈까?');
+      blip(440);
+    } else {
+      startTime = performance.now();
+      running = true;
+      critter.classList.add('walking');
+      startBtn.textContent = '멈춰!';
+      startBtn.classList.add('running');
+      lapBtn.textContent = '랩';
+      lapBtn.disabled = false;
+      say('출발이다냥~!');
+      blip(660);
+    }
+  }
+
+  function lap() {
+    if (!running) return;
+    const t = now();
+    laps.push(t - lapStart);
+    lapStart = t;
+    renderLaps();
+    jump();
+    say(`랩 ${laps.length}! ${format(laps[laps.length - 1])}`);
+    blip(880);
+  }
+
+  function reset() {
+    if (running) return;
+    elapsed = 0; lapStart = 0; laps = [];
+    renderLaps();
+    lapBtn.textContent = '랩';
+    lapBtn.disabled = true;
+    jump();
+    say('처음부터 다시~!');
+    blip(520);
+  }
+
+  startBtn.addEventListener('click', toggle);
+  lapBtn.addEventListener('click', () => (running ? lap() : reset()));
+  critter.addEventListener('click', () => { jump(); say('냥?', 900); blip(990); });
+
+  document.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.code === 'KeyL') lap();
+    else if (e.code === 'KeyR') reset();
+  });
+
+  say('안녕! 시작 버튼을 눌러줘~', 2500);
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>
